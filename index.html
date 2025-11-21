@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ace JS AI - JS Tutor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        /* Custom CSS variables and base styles */
+        :root {
+            --primary-color: #10B981; /* Emerald 500 */
+            --secondary-color: #3B82F6; /* Blue 500 */
+            --background-color: #F9FAFB; /* Gray 50 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 1200px;
+            height: 95vh;
+            background: white;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        .content-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            background-color: #F3F4F6;
+        }
+        .selection-menu {
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100%;
+        }
+        /* Style for interactive buttons */
+        .menu-button {
+            padding: 1rem 1.5rem;
+            margin: 0.5rem;
+            background-color: white;
+            border: 2px solid var(--primary-color);
+            color: #1F2937;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            cursor: pointer;
+            flex-grow: 1; 
+            min-width: 150px; 
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .menu-button:hover:not(:disabled) {
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+        }
+        .menu-grid {
+            /* Responsive grid for buttons */
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+        
+        /* Chat styles */
+        .chat-log {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        .message-container {
+            display: flex;
+            margin-bottom: 1rem;
+        }
+        .user-message { justify-content: flex-end; }
+        .ai-message { justify-content: flex-start; }
+        .message-box {
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            line-height: 1.5;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            white-space: pre-wrap; 
+            text-align: left;
+        }
+        .user-message .message-box {
+            background-color: var(--secondary-color);
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+        .ai-message .message-box {
+            background-color: #E5E7EB; 
+            color: #1F2937; 
+            border-bottom-left-radius: 0;
+        }
+        .ai-message .message-box strong { 
+            font-weight: 700; 
+            color: #059669; /* Emerald 600 */
+        } 
+        /* Markdown list/paragraph styling within chat */
+        .ai-message .message-box > p, .ai-message .message-box > ul, .ai-message .message-box > ol {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Loading indicator styles */
+        .loading-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #6B7280; 
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: dot-bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        .loading-dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes dot-bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                height: 100vh;
+                border-radius: 0;
+            }
+            .message-box {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="container">
+        <header class="p-4 bg-white border-b border-gray-200 flex justify-between items-center shrink-0">
+            
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-800 flex items-center shrink-0">
+                <span class="mr-2 text-3xl" style="color: var(--primary-color);">👨‍🏫</span>
+                Mwalimu Jua
+            </h1>
+            
+            <div class="flex items-center space-x-3 sm:space-x-4">
+                
+                <div id="auth-status" class="text-xs sm:text-sm font-medium text-gray-600 flex-shrink-0 min-w-0">
+                    Focus: <span id="focus-display" class="font-semibold text-gray-800">Select Grade</span>
+                </div>
+
+                <button id="back-button" class="text-sm font-semibold p-2 rounded-lg transition hidden flex-shrink-0 hover:bg-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                    <span id="back-button-text" class="hidden sm:inline-block ml-1">Back</span>
+                </button>
+            </div>
+        </header>
+
+        <div id="content-area" class="content-area flex flex-col">
+            </div>
+
+        <div id="input-area" class="p-4 bg-white border-t border-gray-200 flex items-center hidden shrink-0">
+            <input type="text" id="user-input" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" placeholder="Ask Mwalimu Jua a question...">
+            <button id="send-button" class="ml-3 px-4 sm:px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition duration-150 shadow-md flex items-center justify-center disabled:opacity-50" style="background-color: var(--secondary-color);" disabled>
+                <span id="button-text">Send</span>
+                <svg id="send-icon" class="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7-7m7-7H3"></path></svg>
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // --- CURRICULUM DATA: JSS CBC Structure (Complete and verified) ---
+        const CURRICULUM = {
+            '7': {
+                'Mathematics': {
+                    'Numbers': ['Whole Numbers', 'Factors', 'Fractions', 'Decimals', 'Squares and Square Roots'],
+                    'Algebra': ['Algebraic Expressions', 'Linear Equations in one unknown', 'Linear Inequalities in one unknown'],
+                    'Measurements': ['Pythagorean Relationship', 'Length', 'Area', 'Volume and Capacity', 'Time, Distance and Speed', 'Temperature', 'Money'],
+                    'Geometry': ['Lines and Angles', 'Geometrical Consruction'],
+                    'Data Handling and Probability': ['Data Handling'],
+                },
+                'Integrated Science': {
+                    'Scientific Investigations': ['Introduction to Integrated Science', 'Laboratory Safety and First Aid', 'Laboratory Apparatus'],
+                    'Mixtures, Elements and Compunds': ['Mixtures, Acids, bases and indicators'],
+                    'Living things and the Environment': ['Human reproductive system', 'Human Excretory System'],
+                    'Force and Energy': ['Electrical Energy', 'Magnetism'],
+                },
+                'Social Studies': {
+                    'The Individual and the Community': ['Self-Awareness', 'Personal Responsibility', 'Community Service Learning'],
+                    'The People and Their Life': ['Origin of Humanity', 'Early Societies', 'Cultural Diversity'],
+                    'Resources and Economic Activities': ['Resources in the Environment', 'Economic Activities'],
+                    'Governance and Human Rights': ['The Constitution of Kenya', 'Human Rights and Responsibilities', 'Leadership and Governance'],
+                },
+                'English': {
+                    'Listening and Speaking': ['Diphthongs and Sentence Stress', 'Oral Reports and Presentations', 'Polite Language and Euphemism', 'Oral Literature (Short Forms)'],
+                    'Reading': ['Independent Reading', 'Reading for Meaning', 'Study Skills (Note-Making)', 'Class Reader Analysis'],
+                    'Grammar': ['Nouns and Quantifiers', 'Modal Auxiliaries', 'Present and Past Perfect Aspect', 'Order of Adjectives', 'Relative and Interrogative Pronouns'],
+                    'Writing': ['Punctuation and Legibility', 'Paragraph Structure', 'Narrative and Descriptive Compositions', 'Letters and Forms', 'The Writing Process'],
+                },
+                'Kiswahili': { 
+                    'Kusikiliza na Kuzungumza': ['Utamkaji Sahihi', 'Masimulizi na Majadiliano', 'Ufahamu wa Kusikiliza', 'Ukariri na Ushairi Fupi'],
+                    'Kusoma': ['Kusoma kwa Ufasaha na Ufahamu', 'Kusoma kwa Kina (Intensive Reading)', 'Kusoma kwa Mapana (Extensive Reading)', 'Umuhimu wa Kusoma'],
+                    'Kuandika': ['Kuandika kwa Hati Safi', 'Insha za Wasifu na Maudhui', 'Insha za Maelezo', 'Barua na Matangazo', 'Kujaza Fomu'],
+                    'Sarufi': ['Nomino na Aina za Nomino', 'Vitenzi na Nyakati', 'Viambishi', 'Sentensi na Aina Zake'],
+                },
+                'Pre-Technical Studies': { 
+                    'Fundamentals': ['Safety in the Workshop', 'Handling and Maintenance of Tools', 'Career Exploration'],
+                    'Communication': ['Technical Sketching', 'Measuring Instruments', 'Interpretation of Drawings'],
+                    'Materials and Production': ['Wood and Wood Joints', 'Metals and Plastics', 'Simple Fabrication Processes'],
+                    'Tools and Equipment': ['Holding Tools', 'Measuring Tools', 'Cutting Tools'],
+                    'Entrepreneurship': ['Needs and Wants', 'Resource Mobilisation', 'Enterprise Management'],
+                },
+                'Creative Arts and Sports (CAS)': { 
+                    'Visual Arts': ['Elements and Principles of Design', 'Drawing and Sketching', 'Painting and Colouring', 'Crafts'],
+                    'Performing Arts (Music, Drama)': ['Elements of Music and Drama', 'Vocal and Instrumental Performance', 'Role-Play and Improvisation'],
+                    'Sports': ['Sports Safety and First Aid', 'Fundamental Movement Skills', 'Introduction to Team and Individual Games'],
+                    'Appreciation': ['Art Criticism', 'Appreciation of Performances and Sports'],
+                },
+                'Christian Religious Education (CRE)': { 
+                    'God and Creation': ['God\'s Nature', 'The Bible as the Word of God', 'The Story of Creation'],
+                    'The Life of Jesus Christ': ['Birth and Childhood', 'Baptism and Temptation', 'Teaching and Miracles'],
+                    'The Church': ['The Meaning of the Church', 'Worship and Fellowship'],
+                    'Christian Living': ['Christian Values', 'Responsible Use of Resources', 'Addressing Social Issues'],
+                },
+                'Agriculture': { 
+                    'Agricultural Practices': ['Soil and Water Conservation', 'Crop Production (Planting, Weeding, Pest/Disease Control)', 'Livestock Production (Identification, Health)'],
+                    'Farm Resources': ['Land, Labour, Capital', 'Farm Tools and Equipment'],
+                    'Agri-Business': ['Marketing', 'Record Keeping'],
+                },
+                
+            },
+            '8': {
+                'Mathematics': {
+                    'Numbers': ['Integers', 'Fractions', 'Decimals', 'Squares and Square Roots', 'Rates, Ratios, Proportions and Percentages'],
+                    'Algebra': ['Algebraic Expressions', 'Linear Equations'],
+                    'Measurements': ['Circles', 'Area', 'Money'],
+                    'Geometry': ['Geometrical Constructions', 'Coordinates and graphs', 'Scale Drawing', 'Common Solids'],
+                    'Data Handling and Probability': ['Data Presentation and Interpretation', 'Probability'],
+                },
+                'Integrated Science': {
+                   'Mixtures, Elements and Compounds': ['Physical and Chemical Changes', 'Classes of fire'],
+                    'Living Things and the Environment': ['The cell', 'Movement of materials in and out of the cell', 'Reproduction in human beings'],
+                    'Force and Energy': ['Transformation of Energy', 'Pressure',],
+                },
+                'Social Studies': {
+                    'The Individual and the Community': ['Self-Esteem and Peer Influence', 'Conflict Resolution', 'Community Service-Learning Project'],
+                    'The People and Their Life': ['Historical Sites and Monuments in Africa', 'Trans-Atlantic Slave Trade', 'Urbanization'],
+                    'Resources and Economic Activities': ['Trade and Commerce', 'Transport and Communication', 'Industrialization in Africa'],
+                    'Governance and Human Rights': ['Devolved Government', 'Public Service Delivery', 'International Human Rights'],
+                },
+                'English': {
+                    'Listening and Speaking': ['Dramatization and Role-Play', 'Formal Debates', 'Oral Narratives (Analyzing Style)', 'Listening to Evaluate'],
+                    'Reading': ['Reading for Pleasure (Fiction/Non-Fiction)', 'Intensive Reading (Key Events, Plot)', 'Reference Materials (Dictionary, Thesaurus)', 'Poetry Analysis (Structure, Themes)'],
+                    'Grammar': ['Active and Passive Voice', 'Reported Speech', 'Conditional Sentences', 'Complex Prepositions', 'Phrasal Verbs', 'Tense Review'],
+                    'Writing': ['Expository Writing', 'Formal Letters', 'Minutes of a Meeting', 'Creative Non-Fiction', 'Proofreading and Editing Skills'],
+                    
+                },
+                'Kiswahili': { 
+                    'Kusikiliza na Kuzungumza': ['Ufupisho wa Hotuba', 'Kutunga na Kuigiza Mazungumzo', 'Matamshi ya Maneno', 'Kujieleza kwa Lugha Sanifu'],
+                    'Kusoma': ['Kusoma kwa Ufasaha na Lugha ya Kimtindo', 'Ufafanuzi wa Maneno na Udadisi', 'Tafakari ya Kusoma', 'Uchambuzi wa Kazi za Fasihi'],
+                    'Kuandika': ['Insha za Hoja', 'Barua za Kiofisi', 'Insha za Methali', 'Insha Fupi za Tahadhari na Onyo'],
+                    'Sarufi': ['Vihusishi (Mahali, Wakati, Sababu)', 'Nyakati na Hali (Masharti -ki-, -ka-, -nge-, -ngali-)', 'Vielezi (Namna, Wakati, Mahali)', 'Ngeli ya U-ZI na YA-YA', 'Usemi Halisi na Taarifa'],
+                },
+                'Pre-Technical Studies': { 
+                    'Fundamentals': ['Safety Regulations (Health and Environment)', 'Material Science (Metals, Non-Metals)', 'Career Pathways in Technology'],
+                    'Communication': ['Orthographic Projection (Advanced)', 'Computer Aided Design (CAD) - Introduction'],
+                    'Materials and Production': ['Ceramics and Glass', 'Joining Methods (Welding, Soldering)', 'Casting and Moulding'],
+                    'Tools and Equipment': ['Power Tools', 'Assembly Tools', 'Measurement and Calibration'],
+                    'Entrepreneurship': ['Market Research', 'Feasibility Study', 'Business Ethics and Law'],
+                },
+                'Creative Arts and Sports (CAS)': { 
+                    'Visual Arts': ['Sculpture and Pottery', 'Printing Techniques', 'Photography and Digital Media'],
+                    'Performing Arts (Music, Drama)': ['Music Composition (Simple forms)', 'Play Production (Stage Management, Costumes)', 'Choreography and Movement'],
+                    'Sports': ['Team Games (Football, Rugby, Basketball)', 'Individual Games (Badminton, Table Tennis)'],
+                    'Appreciation': ['Art History and Cultural Heritage', 'Analyzing Music and Drama Performances', 'Sports Psychology and Fair Play'],
+                },
+                'Christian Religious Education (CRE)': { 
+                    'God and His People': ['Covenant with Abraham', 'The Ten Commandments', 'The Judges'],
+                    'The Life of Jesus Christ': ['Parables of the Kingdom', 'The Sermon on the Mount (Beatitudes)', 'Triumphal Entry and Last Supper'],
+                    'The Church': ['The Early Church', 'The Gifts of the Holy Spirit', 'Worship and Sacraments'],
+                    'Christian Living': ['Wealth, Money, and Poverty', 'Leisure and Recreation', 'Responsible Parenthood'],
+                },
+                'Agriculture': { 
+                    'Agricultural Practices': ['Tillage and Planting Methods', 'Pest and Disease Control (Chemical/Biological)', 'Animal Health and Management (Vaccination, De-worming)'],
+                    'Farm Resources': ['Water Harvesting and Irrigation', 'Fertilizers and Manures', 'Agricultural Structures'],
+                    'Agri-Business': ['Agribusiness Planning', 'Risk Management', 'Value Addition'],
+                },
+                
+            },
+            '9': {
+                'Mathematics': {
+                    'Numbers': ['Integers', 'Cubes and Cube Roots', 'Indices and Logarithms', 'Compound Proportions and Rates of Work'],
+                    'Algebra': ['Matrices', 'Equations of a Straight Line', 'Linear Inequalities'],
+                    'Measurements': ['Area', 'Volume of Solids', 'Mass, Volume, Weight, and Density', 'Time, Distance, and Speed', 'Money', 'Approximations and Errors'],
+                    'Geometry': ['Coordinates and Graphs', 'Scale Drawing', 'Similarity and Enlargement', 'Trigonometry'],
+                    'Data Handling and Probability': ['Data Interpretation(Grouped Data)', 'Probability'],
+                },
+                'Integrated Science': {
+                    'Mixtures, Elements and Compounds': ['Structure of the Atom', 'Metals and alloys', 'Water Hardness'],
+                    'Living Things and the Environment': ['Nutrition in plants', 'Nutrition in animals', 'Reproduction in plants', 'The interdependence of life'],
+                    'Force and Energy': ['Curved Mirros', 'Waves'],
+                },
+                'Social Studies': {
+                    'The Individual and the Community': ['Career Pathway Choices', 'Entrepreneurship Skills', 'Global Citizenship'],
+                    'The People and Their Life': ['Socio-economic Practices of Early Humans', 'Indigenous Knowledge Systems', 'Effects of Globalisation'],
+                    'Resources and Economic Activities': ['Financial Services', 'Government and Business', 'Sustainable Resource Management'],
+                    'Governance and Human Rights': ['The Bill of Rights (Advanced)', 'Civic Engagement in Governance', 'Regional and International Cooperation'],
+                },
+                'English': {
+                    'Listening and Speaking': ['Interviews (Formal and Informal)', 'Analyzing Speeches and Public Discourse', 'Group Presentation Skills', 'Conflict Resolution through Dialogue'],
+                    'Reading': ['Critical Evaluation of Texts', 'Synthesizing Information from Multiple Sources', 'Literary Devices (Advanced Analysis)', 'Research Skills (Source Evaluation)'],
+                    'Grammar': ['Complex Sentence Structures', 'Tense Consistency', 'Relative Clauses', 'Inversion'],
+                    'Writing': ['Argumentative and Persuasive Essays', 'Research Proposals', 'Curriculum Vitae (CV) and Application Letters', 'Editing for Flow, Cohesion, and Coherence'],
+                },
+                'Kiswahili': { 
+                    'Kusikiliza na Kuzungumza': ['Ushauri na Maonyo', 'Mahojiano Rasmi', 'Kukosoa na Kujitetea', 'Uchambuzi wa Sifa za Hadithi'],
+                    'Kusoma': ['Kusoma kwa Kasi', 'Uchambuzi wa Kazi za Fasihi', 'Kusoma kwa Lugha ya Utafiti'],
+                    'Kuandika': ['Insha za Mawazo na Hoja', 'Kuandika Kadi za Mwaliko na Tahakiki', 'Kuandika Kumbukumbu (Memoirs)', 'Miundo Tofauti ya Sentensi'],
+                    'Sarufi': ['Mnyambuliko wa Vitenzi (Kauli Zote)', 'Matumizi ya Viwakilishi', 'Vibadala na Uakifishaji wa Kisasa', 'Aina za Sentensi (Tenganisho)'],
+                },
+                'Pre-Technical Studies': { 
+                    'Fundamentals & Safety': ['Advanced Safety Practices (Raised Platforms, Chemicals)', 'Career Development and Mentorship'],
+                    'Communication': ['Oblique Projection', 'Visual Programming and Coding Basics'],
+                    'Materials and Production': ['Wood (Advanced Joints and Finishes)', 'Handling Waste Materials', 'Material Testing'],
+                    'Tools & Projects': ['Driving Tools', 'Precision Measuring Tools', 'Design and Fabrication of a Project'],
+                    'Entrepreneurship': ['Financial Services and Investment', 'Business Plan Development', 'Regulatory Environment'],
+                },
+                'Creative Arts and Sports (CAS)': { 
+                    'Visual Arts': ['Digital Design and Animation', 'Art Installation', 'Aesthetics and Philosophy of Art'],
+                    'Performing Arts (Music, Drama)': ['Advanced Music Production (Digital Audio)', 'Directing and Staging', 'Scriptwriting', 'Movement and Choreography'],
+                    'Sports': ['Advanced Training Techniques', 'Sports Management and Officiating', 'Individual Sports Mastery'],
+                    'Appreciation': ['Global Art Movements and Influences', 'Cultural Impact of Arts and Sports', 'Performance Critique and Review'],
+                },
+                'Christian Religious Education (CRE)': { 
+                    'God and His People': ['Covenant with Abraham', 'The Ten Commandments', 'The Judges'],
+                    'The Life of Jesus Christ': ['Major Healing Miracles (Widow\'s Son, Ten Lepers)', 'Parables on Prayer', 'The Nicodemus Encounter', 'Events in Jerusalem (Trial, Crucifixion, Resurrection)'],
+                    'The Church': ['The Early Church and Missionary Journeys', 'The Seven Sacraments', 'Ecumenism'],
+                    'Christian Living': ['Courtship and Marriage', 'Christianity and Work', 'Addressing Corruption and Social Justice'],
+                },
+                'Agriculture': { 
+                    'Agricultural Practices': ['Agroforestry', 'Greenhouse Farming', 'Value Addition and Processing'],
+                    'Farm Resources': ['Agricultural Machinery and Equipment', 'Farm Structures and Housing', 'Financial Management in Agriculture'],
+                    'Agri-Business': ['E-commerce in Agriculture', 'Innovation in Farming', 'Cooperative Societies'],
+                },
+                
+            },
+        };
+        
+        // --- API CONFIGURATION (SECURE FLASK ROUTING) ---
+        // Chat requests are routed to the Flask backend for security.
+        const FLASK_API_URL = 'http://127.0.0.1:5000/chat'; 
+
+        // --- DOM Elements ---
+        const CONTENT_AREA = document.getElementById('content-area');
+        const INPUT_AREA = document.getElementById('input-area');
+        const USER_INPUT = document.getElementById('user-input');
+        const SEND_BUTTON = document.getElementById('send-button');
+        const FOCUS_DISPLAY = document.getElementById('focus-display');
+        const BACK_BUTTON = document.getElementById('back-button');
+        const BACK_BUTTON_TEXT = document.getElementById('back-button-text');
+        const BUTTON_TEXT = document.getElementById('button-text');
+        
+        // --- APP STATE MANAGEMENT ---
+        let appState = {
+            phase: 'grade', // Correct initial phase
+            selectedGrade: null,
+            selectedArea: null,
+            selectedStrand: null,
+            history: [] // Holds { role, text } for the current chat session
+        };
+
+        // --- UI RENDERING HELPERS ---
+
+        /** Renders Markdown to HTML safely (Requires the 'marked' CDN script) */
+        function renderMarkdown(markdownText) {
+            if (typeof marked === 'undefined') {
+                return markdownText;
+            }
+            return marked.parse(markdownText);
+        }
+
+        // --- NAVIGATION LOGIC (State Transitions) ---
+
+        function goBack() {
+            if (appState.phase === 'area') {
+                appState.selectedGrade = null;
+                appState.phase = 'grade';
+            } else if (appState.phase === 'strand') {
+                appState.selectedArea = null;
+                appState.phase = 'area';
+            }
+            // If in chat, clicking back resets the entire session
+            else if (appState.phase === 'chat') {
+                appState.selectedGrade = null; 
+                appState.selectedArea = null;
+                appState.selectedStrand = null;
+                appState.history = [];
+                appState.phase = 'grade'; 
+                INPUT_AREA.classList.add('hidden');
+                SEND_BUTTON.disabled = true;
+            }
+            renderApp();
+        };
+
+        function selectGrade(grade) {
+            appState.selectedGrade = String(grade); 
+            appState.phase = 'area';
+            renderApp();
+        }
+
+        function selectArea(area) {
+            appState.selectedArea = area;
+            appState.phase = 'strand';
+            renderApp();
+        }
+
+        async function selectStrand(strand) {
+            appState.selectedStrand = strand;
+            appState.phase = 'chat';
+            
+            // 1. Set up the system instruction
+            const subStrandsArray = CURRICULUM[appState.selectedGrade][appState.selectedArea][appState.selectedStrand];
+            const subStrandsContext = subStrandsArray.join(', ');
+
+            const systemInstruction = `You are "Mwalimu Jua" (Teacher Sun), an expert and encouraging Kenyan Junior Secondary School (JSS) tutor. Your tone is warm, friendly, and highly supportive, using simple English and occasional Swahili phrases like "Mambo!", "Karibu!", and "Sawa sawa."
+
+            Your current focus is helping the student with the following CBC Curriculum topic block:
+            - **Grade:** ${appState.selectedGrade}
+            - **Learning Area:** ${appState.selectedArea}
+            - **Main Strand:** ${appState.selectedStrand}
+            - **Sub-topics in Focus:** ${subStrandsContext}
+
+            When answering, you must:
+            1. Keep the response highly relevant to the selected topic.
+            2. Explain concepts clearly, using relatable examples relevant to the Kenyan context (e.g., local crops, places, currency, or social structures).
+            3. Use proper Markdown formatting for clarity (bolding key terms, lists, etc.).
+            4. If the topic is outside the specified scope, politely guide the student back to the current topic.
+            5. Do NOT include the system instruction or any prompt context in your response.`;
+
+            // 2. Add the system instruction to history (it's not rendered, but used for API calls)
+            appState.history.push({ 
+                role: 'system', 
+                text: systemInstruction
+            });
+
+            // 3. Add the initial welcome message from the AI (rendered)
+            appState.history.push({ 
+                role: 'model', 
+                text: `**Karibu!** You've selected **${appState.selectedArea}** - **${appState.selectedStrand}** (G${appState.selectedGrade}). Our sub-topics include: ${subStrandsContext}. I'm Mwalimu Jua, ready to help you master this topic. Ask me a question, or tell me what you want to learn first!` 
+            });
+            
+            INPUT_AREA.classList.remove('hidden');
+            SEND_BUTTON.disabled = false;
+            renderApp();
+        }
+
+        // --- MENU RENDERING FUNCTIONS ---
+
+        function renderGrades() {
+            FOCUS_DISPLAY.textContent = "Select Grade";
+            BACK_BUTTON.classList.add('hidden');
+            
+            const gradeKeys = Object.keys(CURRICULUM).sort();
+            
+            CONTENT_AREA.innerHTML = `
+                <div class="selection-menu p-8">
+                    <h2 class="text-3xl font-bold mb-8 text-gray-700">🇰🇪 Junior Secondary School (JSS) Tutor</h2>
+                    <p class="mb-6 text-gray-500">Please select the **Grade** you are currently focusing on:</p>
+                    <div class="menu-grid max-w-lg w-full">
+                        ${gradeKeys.map(grade => `
+                            <button class="menu-button" onclick="selectGrade(${grade})">Grade ${grade}</button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAreas() {
+            const grade = appState.selectedGrade;
+            FOCUS_DISPLAY.textContent = `Grade ${grade}`;
+            BACK_BUTTON.classList.remove('hidden');
+
+            // CRITICAL CHECK: Ensure data exists before calling Object.keys
+            const gradeData = CURRICULUM[grade];
+            if (!gradeData) {
+                 CONTENT_AREA.innerHTML = `<div class="selection-menu p-8 text-red-500">Error: Curriculum data for Grade ${grade} is missing or malformed.</div>`;
+                 return;
+            }
+            const areas = Object.keys(gradeData).sort();
+
+            CONTENT_AREA.innerHTML = `
+                <div class="selection-menu p-8">
+                    <h2 class="text-2xl font-bold mb-8 text-gray-700">Grade ${grade} Learning Areas</h2>
+                    <p class="mb-6 text-gray-500">Which **Learning Area** do you want to study today?</p>
+                    <div class="menu-grid max-w-3xl w-full">
+                        ${areas.map(area => `
+                            <button class="menu-button" onclick="selectArea('${area}')">${area}</button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStrands() {
+            const grade = appState.selectedGrade;
+            const area = appState.selectedArea;
+            FOCUS_DISPLAY.textContent = `${area} (G${grade})`;
+            BACK_BUTTON.classList.remove('hidden');
+
+            const strands = Object.keys(CURRICULUM[grade][area]).sort();
+
+            CONTENT_AREA.innerHTML = `
+                <div class="selection-menu p-8">
+                    <h2 class="text-2xl font-bold mb-8 text-gray-700">${area} Strands (G${grade})</h2>
+                    <p class="mb-6 text-gray-500">Now, select the **Main Strand** you need help with:</p>
+                    <div class="menu-grid max-w-4xl w-full">
+                        ${strands.map(strand => `
+                            <button class="menu-button" onclick="selectStrand('${strand}')">${strand}</button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- CHAT RENDERING FUNCTIONS ---
+        
+        function renderChat() {
+            const grade = appState.selectedGrade;
+            const area = appState.selectedArea;
+            const strand = appState.selectedStrand;
+            FOCUS_DISPLAY.textContent = `${area}: ${strand} (G${grade})`;
+            BACK_BUTTON.classList.remove('hidden');
+            INPUT_AREA.classList.remove('hidden');
+            
+            // Clear and set up chat log structure
+            CONTENT_AREA.innerHTML = `<div id="chat-log" class="chat-log flex flex-col p-4 space-y-4 h-full"></div>`;
+            const chatLog = document.getElementById('chat-log');
+            
+            // Render messages from history
+            // Filter out the 'system' message as it's not meant to be displayed in the chat log.
+            appState.history.filter(m => m.role !== 'system').forEach(message => {
+                const messageContainer = document.createElement('div');
+                messageContainer.className = `message-container ${message.role === 'user' ? 'user-message' : 'ai-message'} w-full`;
+                
+                const messageBox = document.createElement('div');
+                messageBox.className = 'message-box';
+
+                if (message.role === 'model') {
+                    // Use the Markdown parser for AI responses
+                    messageBox.innerHTML = renderMarkdown(message.text);
+                } else {
+                    // Plain text for user messages
+                    messageBox.textContent = message.text;
+                }
+                
+                messageContainer.appendChild(messageBox);
+                chatLog.appendChild(messageContainer);
+            });
+            
+            // Scroll to the bottom of the chat log
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function renderLoadingState() {
+            const existingLoading = document.getElementById('ai-loading-indicator');
+            if (existingLoading) return;
+
+            const chatLog = document.getElementById('chat-log');
+            if (!chatLog) return;
+            
+            const loadingContainer = document.createElement('div');
+            loadingContainer.id = 'ai-loading-indicator';
+            loadingContainer.className = 'message-container ai-message w-full';
+            
+            const loadingBox = document.createElement('div');
+            loadingBox.className = 'message-box';
+            loadingBox.innerHTML = `
+                <div class="flex items-center space-x-1">
+                    <span class="text-sm text-gray-500">Mwalimu Jua is typing</span>
+                    <span class="loading-dot"></span>
+                    <span class="loading-dot"></span>
+                    <span class="loading-dot"></span>
+                </div>
+            `;
+            
+            loadingContainer.appendChild(loadingBox);
+            chatLog.appendChild(loadingContainer);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function removeLoadingState() {
+            const loading = document.getElementById('ai-loading-indicator');
+            if (loading) {
+                loading.remove();
+            }
+        }
+
+        // --- CORE RENDERER ---
+        
+        function renderApp() {
+            // 1. Determine which content to render based on phase
+            if (appState.phase === 'grade') {
+                renderGrades();
+            } else if (appState.phase === 'area') {
+                renderAreas();
+            } else if (appState.phase === 'strand') {
+                renderStrands();
+            } else if (appState.phase === 'chat') {
+                renderChat();
+            }
+            
+            // 2. Manage input/send button state
+            if (appState.phase === 'chat') {
+                INPUT_AREA.classList.remove('hidden');
+            } else {
+                INPUT_AREA.classList.add('hidden');
+            }
+        }
+        
+        // --- CHAT FUNCTIONALITY (ROUTED TO FLASK) ---
+
+        async function handleSend() {
+            const userText = USER_INPUT.value.trim();
+            if (!userText) return;
+
+            // 1. Disable input and show loading state
+            SEND_BUTTON.disabled = true;
+            USER_INPUT.disabled = true;
+            USER_INPUT.value = '';
+            
+            // 2. Add user message to history and render
+            appState.history.push({ role: 'user', text: userText });
+            renderChat(); // Re-render to show the new user message
+            renderLoadingState(); // Show the typing indicator
+
+            try {
+                // --- CRITICAL FIX: Filtering history for the API call ---
+                
+                // Find the system instruction (which is always the first item in the history array with role 'system')
+                const systemInstruction = appState.history.find(m => m.role === 'system')?.text || '';
+                
+                // Get the chat history to send (MUST filter out the 'system' instruction)
+                // This ensures the back-end only receives 'user' and 'model' roles for context.
+                const filteredChatHistory = appState.history.filter(m => m.role !== 'system');
+                
+                const requestBody = {
+                    system_instruction: systemInstruction,
+                    history: filteredChatHistory // Send the CLEAN history
+                };
+                // --- END CRITICAL FIX ---
+                
+                const options = {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody),
+                };
+
+                // 4. Send request to the local Flask API
+                const response = await fetch(FLASK_API_URL, options);
+
+                if (!response.ok) {
+                    // Attempt to read the error message from Flask if available
+                    let errorDetail = '';
+                    try {
+                        const errorData = await response.json();
+                        errorDetail = errorData.error ? `\nFlask Detail: ${errorData.error}` : '';
+                    } catch (e) {
+                        // Ignore if JSON parsing fails
+                    }
+                    // Throw a custom error including the status code
+                    throw new Error(`Flask Server Error: ${response.status} - ${response.statusText}${errorDetail}`);
+                }
+
+                const data = await response.json();
+
+                // 5. Extract the AI's response text from the Flask response
+                let aiText = data.text || "Sorry, Mwalimu Jua encountered an unknown error from the server.";
+                
+                // 6. Add AI response to history
+                appState.history.push({ role: 'model', text: aiText });
+                
+            } catch (error) {
+                console.error("API call failed:", error);
+                // Custom error message for Flask/connection issues
+                const errorText = `**Lamenting!** A connection error occurred with your Flask server (${FLASK_API_URL}). Please ensure your server is running and the network connection is stable. Error: ${error.message}`;
+                appState.history.push({ role: 'model', text: errorText });
+            } finally {
+                // 7. Remove loading and re-enable input/send
+                removeLoadingState();
+                renderChat(); 
+                SEND_BUTTON.disabled = false;
+                USER_INPUT.disabled = false;
+                USER_INPUT.focus();
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial render
+            renderApp(); 
+
+            // Back button listener
+            BACK_BUTTON.addEventListener('click', goBack);
+
+            // Send button listener
+            SEND_BUTTON.addEventListener('click', handleSend);
+
+            // Enter key listener for input field
+            USER_INPUT.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !SEND_BUTTON.disabled) {
+                    handleSend();
+                }
+            });
+            
+            // Input change listener to enable/disable send button
+            USER_INPUT.addEventListener('input', () => {
+                // Only enable if in chat phase and text is present
+                if (appState.phase === 'chat') {
+                    SEND_BUTTON.disabled = USER_INPUT.value.trim() === '';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
