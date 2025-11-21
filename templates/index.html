@@ -366,6 +366,8 @@
         // --- API CONFIGURATION (SECURE FLASK ROUTING) ---
         // Chat requests are routed to the Flask backend for security.
          const FLASK_API_ENDPOINT = '/generate';
+         // We add FLASK_API_URL for compatibility with the handleSend function.
+         const FLASK_API_URL = '/generate';
 
         // --- DOM Elements ---
         const CONTENT_AREA = document.getElementById('content-area');
