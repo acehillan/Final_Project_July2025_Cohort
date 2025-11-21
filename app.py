@@ -2,8 +2,8 @@ import os
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from google import genai
-from google.generativeai import types
-from google.generativeai.errors import APIError
+from google.genai import types
+from google.genai.errors import APIError
 
 # --- FLASK SETUP ---
 # Create the Flask application instance.
