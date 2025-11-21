@@ -6,28 +6,20 @@ from google.genai import types
 from google.genai.errors import APIError
 
 # --- FLASK SETUP ---
-# Create the Flask application instance.
-# IMPORTANT: Explicitly defining 'template_folder' helps Gunicorn find index.html
-# inside the 'templates' subdirectory, resolving the persistent 404 error.
 app = Flask(__name__, template_folder='templates') 
-# Enable CORS for cross-origin requests from the frontend
 CORS(app) 
 
 # --- CONFIGURATION & SECRETS ---
-# Retrieve the API key from the environment variables (set on Render)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not API_KEY:
-    # This warning is harmless on Render, where the key is injected.
     print("WARNING: GEMINI_API_KEY environment variable not set. App will only function on Render.")
     
 # --- GEMINI MODEL SETUP ---
 def initialize_gemini_client(api_key):
-    """Initializes the Gemini client."""
     if not api_key:
         return None
     try:
-        # Client initialized with API key from environment
         return genai.Client(api_key=api_key)
     except Exception as e:
         print(f"Error initializing Gemini client: {e}")
@@ -39,14 +31,15 @@ client = initialize_gemini_client(API_KEY)
 
 @app.route('/')
 def index():
-    """Serves the main HTML page (the frontend)."""
-    # Flask now knows to look in the 'templates' folder for this file.
     return render_template('index.html')
 
 
 @app.route('/generate', methods=['POST'])
 def generate_content():
-    """Handles the POST request from the frontend to generate AI content."""
+    """
+    Handles the POST request from the frontend to generate AI content.
+    FIX: Removed crash-causing citation parsing logic.
+    """
     if client is None:
         return jsonify({"error": "AI client not initialized. Check server configuration."}), 503
 
@@ -79,25 +72,16 @@ def generate_content():
             ),
         )
 
-        # 5. Extract the text and citation sources
+        # 5. Extract the text (The faulty citation parsing block is permanently removed)
         text = response.text
-        sources = []
-        grounding_metadata = response.candidates[0].grounding_metadata
         
-        if grounding_metadata and grounding_metadata.grounding_attributions:
-            sources = [
-                {
-                    "uri": attribution.web.uri,
-                    "title": attribution.web.title
-                }
-                for attribution in grounding_metadata.grounding_attributions
-                if attribution.web and attribution.web.uri and attribution.web.title
-            ]
+        # Return an empty 'sources' array to maintain the JSON contract with your frontend.
+        empty_sources = [] 
 
         # 6. Return the AI response and sources to the frontend
         return jsonify({
             "response": text,
-            "sources": sources
+            "sources": empty_sources 
         })
 
     except APIError as e:
@@ -109,6 +93,5 @@ def generate_content():
 
 
 # --- ENTRY POINT ---
-# This block is primarily for local testing; Gunicorn handles startup on Render.
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=os.environ.get('PORT', 5000))
