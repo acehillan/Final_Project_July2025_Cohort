@@ -6,10 +6,14 @@ from google.genai import types
 from google.genai.errors import APIError
 
 # --- FLASK SETUP ---
+# Create the Flask application instance.
+# IMPORTANT: Explicitly defining 'template_folder' helps Gunicorn find index.html
 app = Flask(__name__, template_folder='templates') 
+# Enable CORS for cross-origin requests from the frontend
 CORS(app) 
 
 # --- CONFIGURATION & SECRETS ---
+# Retrieve the API key from the environment variables (set on Render)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not API_KEY:
@@ -17,9 +21,11 @@ if not API_KEY:
     
 # --- GEMINI MODEL SETUP ---
 def initialize_gemini_client(api_key):
+    """Initializes the Gemini client."""
     if not api_key:
         return None
     try:
+        # Client initialized with API key from environment
         return genai.Client(api_key=api_key)
     except Exception as e:
         print(f"Error initializing Gemini client: {e}")
@@ -31,6 +37,7 @@ client = initialize_gemini_client(API_KEY)
 
 @app.route('/')
 def index():
+    """Serves the main HTML page (the frontend)."""
     return render_template('index.html')
 
 
@@ -38,7 +45,7 @@ def index():
 def generate_content():
     """
     Handles the POST request from the frontend to generate AI content.
-    FIX: Removed crash-causing citation parsing logic.
+    Includes robust error checking to prevent 500 errors from empty/blocked responses.
     """
     if client is None:
         return jsonify({"error": "AI client not initialized. Check server configuration."}), 503
@@ -72,11 +79,21 @@ def generate_content():
             ),
         )
 
-        # 5. Extract the text (The faulty citation parsing block is permanently removed)
-        text = response.text
+        # 5. ROBUST CHECK: Ensure the response contains valid text before processing
+        # This prevents the AttributeError/IndexError that caused the 500 crash.
+        if not response.candidates or not response.text:
+             # Log the warning internally
+             print(f"Warning: Model response was blocked or empty for query: {user_query}")
+             
+             # Return a client-side error (400) with a friendly message
+             return jsonify({
+                "response": "Pole sana (My apologies), Mwalimu Jua could not generate a response for that query. Please try rephrasing.",
+                "sources": [] 
+             }), 400 
         
-        # Return an empty 'sources' array to maintain the JSON contract with your frontend.
-        empty_sources = [] 
+        # If text is valid, proceed
+        text = response.text
+        empty_sources = [] # Citation extraction is skipped, returning empty array to frontend
 
         # 6. Return the AI response and sources to the frontend
         return jsonify({
