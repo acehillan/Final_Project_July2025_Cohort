@@ -44,7 +44,7 @@ Installation
 
 Clone the repository:
 
-git clone [Your Repository URL]
+git clone https://github.com/acehillan/Final_Project_July2025_Cohort.git
 cd Mwalimu Jua
 
 
