@@ -38,6 +38,7 @@ client = initialize_gemini_client(API_KEY)
 @app.route('/')
 def index():
     """Serves the main HTML page (the frontend)."""
+    # NOTE: Assuming your index.html is in a 'templates' folder as per standard Flask convention
     return render_template('index.html')
 
 
@@ -45,13 +46,13 @@ def index():
 def generate_content():
     """
     Handles the POST request from the frontend to generate AI content.
-    Includes robust error checking to prevent 500 errors from empty/blocked responses.
+    Includes robust error checking and uses the 'response' field for output.
     """
     if client is None:
         return jsonify({"error": "AI client not initialized. Check server configuration."}), 503
 
     try:
-        # 1. Get user query from the request body
+        # 1. Get user query from the request body (Frontend now sends 'prompt')
         data = request.get_json()
         user_query = data.get('prompt', 'Please explain a topic briefly.')
         
@@ -80,12 +81,8 @@ def generate_content():
         )
 
         # 5. ROBUST CHECK: Ensure the response contains valid text before processing
-        # This prevents the AttributeError/IndexError that caused the 500 crash.
         if not response.candidates or not response.text:
-             # Log the warning internally
              print(f"Warning: Model response was blocked or empty for query: {user_query}")
-             
-             # Return a client-side error (400) with a friendly message
              return jsonify({
                 "response": "Pole sana (My apologies), Mwalimu Jua could not generate a response for that query. Please try rephrasing.",
                 "sources": [] 
@@ -93,12 +90,11 @@ def generate_content():
         
         # If text is valid, proceed
         text = response.text
-        empty_sources = [] # Citation extraction is skipped, returning empty array to frontend
-
-        # 6. Return the AI response and sources to the frontend
+        
+        # 6. Return the AI response using the 'response' field expected by the frontend
         return jsonify({
-            "response": text,
-            "sources": empty_sources 
+            "response": text, # CRITICAL: Use 'response' field
+            "sources": [] 
         })
 
     except APIError as e:

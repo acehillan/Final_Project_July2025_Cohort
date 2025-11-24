@@ -636,7 +636,7 @@
             }
         }
         
-        // --- CHAT FUNCTIONALITY (ROUTED TO FLASK) ---
+       // --- CHAT FUNCTIONALITY (ROUTED TO FLASK) ---
 
         async function handleSend() {
             const userText = USER_INPUT.value.trim();
@@ -653,20 +653,11 @@
             renderLoadingState(); // Show the typing indicator
 
             try {
-                // --- CRITICAL FIX: Filtering history for the API call ---
-                
-                // Find the system instruction (which is always the first item in the history array with role 'system')
-                const systemInstruction = appState.history.find(m => m.role === 'system')?.text || '';
-                
-                // Get the chat history to send (MUST filter out the 'system' instruction)
-                // This ensures the back-end only receives 'user' and 'model' roles for context.
-                const filteredChatHistory = appState.history.filter(m => m.role !== 'system');
-                
+                // --- CORRECTED API REQUEST BODY ---
+                // The server (app.py) only needs the latest user prompt. 
                 const requestBody = {
-                    system_instruction: systemInstruction,
-                    history: filteredChatHistory // Send the CLEAN history
+                    prompt: userText // Only send the latest user message
                 };
-                // --- END CRITICAL FIX ---
                 
                 const options = {
                     method: 'POST',
@@ -683,19 +674,23 @@
                     // Attempt to read the error message from Flask if available
                     let errorDetail = '';
                     try {
+                        // Check if the server returned a friendly error JSON
                         const errorData = await response.json();
-                        errorDetail = errorData.error ? `\nFlask Detail: ${errorData.error}` : '';
+                        // This handles the server's friendlier error message we put in app.py
+                        errorDetail = errorData.response ? `\nServer Message: ${errorData.response}` : `\nFlask Detail: ${errorData.error || 'No detail provided.'}`;
                     } catch (e) {
-                        // Ignore if JSON parsing fails
+                        // If JSON parsing fails, just use the status text
+                        errorDetail = `\nStatus: ${response.statusText}`;
                     }
                     // Throw a custom error including the status code
-                    throw new Error(`Flask Server Error: ${response.status} - ${response.statusText}${errorDetail}`);
+                    throw new Error(`Flask Server Error: ${response.status}${errorDetail}`);
                 }
 
                 const data = await response.json();
 
-                // 5. Extract the AI's response text from the Flask response
-                let aiText = data.text || "Sorry, Mwalimu Jua encountered an unknown error from the server.";
+                // 5. CRITICAL FIX: Extract the AI's response text from the Flask response
+                // The server returns the text in the 'response' field, not 'text'.
+                let aiText = data.response || "Sorry, Mwalimu Jua encountered an unknown error from the server.";
                 
                 // 6. Add AI response to history
                 appState.history.push({ role: 'model', text: aiText });
@@ -703,7 +698,7 @@
             } catch (error) {
                 console.error("API call failed:", error);
                 // Custom error message for Flask/connection issues
-                const errorText = `**Lamenting!** A connection error occurred with your Flask server (${FLASK_API_URL}). Please ensure your server is running and the network connection is stable. Error: ${error.message}`;
+                const errorText = `**Lamenting!** A connection error occurred with your Flask server. Error: ${error.message}`;
                 appState.history.push({ role: 'model', text: errorText });
             } finally {
                 // 7. Remove loading and re-enable input/send
