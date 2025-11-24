@@ -81,4 +81,4 @@ Live Demo: https://final-project-july2025-cohort.onrender.com
 
 ✍️ Author
 
-[Your Name] - [Your GitHub Profile Link]
+Njoki Hillan - 
